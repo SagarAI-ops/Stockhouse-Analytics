@@ -1,62 +1,72 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Package, Layers, Target, Timer, Loader2 } from "lucide-react";
 
 import Header from "../components/layout/Header";
 import FilterBar from "../components/layout/FilterBar";
 import KpiCard from "../components/ui/KpiCard";
 import DataTable from "../components/ui/DataTable";
+import AlertBanner from "../components/ui/AlertBanner";
 import PrecisionControlChart from "../components/charts/PrecisionControlChart";
 import CycleTimeBarChart from "../components/charts/CycleTimeBarChart";
 import MaterialAggregationChart from "../components/charts/MaterialAggregationChart";
+import DailyAggregationChart from "../components/charts/DailyAggregationChart";
 
-import { fetchFilters, fetchDashboardData } from "../api/client";
+import { fetchAlerts, fetchDashboardData, fetchFilters } from "../api/client";
 import { useFilterStore } from "../store/useFilterStore";
-import type { FilterOptions, DashboardResponse } from "../types";
+import type { Alert, DashboardResponse, FilterOptions } from "../types";
 
-export default function Dashboard() {
+interface Props {
+  currentView?: "dashboard" | "forecast";
+  onNavigate?: (view: "dashboard" | "forecast") => void;
+}
+
+export default function Dashboard({ currentView, onNavigate }: Props) {
   const { startDate, endDate, shift, hopperId } = useFilterStore();
 
   const [filters, setFilters] = useState<FilterOptions | null>(null);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load filter options once on mount
   useEffect(() => {
     fetchFilters()
       .then(setFilters)
       .catch(() => setError("Failed to load filter options"));
   }, []);
 
-  // Fetch dashboard data whenever filters change, with cancellation guard
-  useEffect(() => {
-    let cancelled = false;
+  const loadDashboard = useCallback(() => {
     setLoading(true);
     setError(null);
 
-    fetchDashboardData({
+    return fetchDashboardData({
       start_date: startDate,
       end_date: endDate,
       shift,
       hopper_id: hopperId,
     })
-      .then((data) => {
-        if (!cancelled) setDashboard(data);
-      })
+      .then((data) => setDashboard(data))
       .catch(() => {
-        if (!cancelled) {
-          setError("Failed to load dashboard data. Is the backend running?");
-          setDashboard(null);
-        }
+        setError("Failed to load dashboard data. Is the backend running?");
+        setDashboard(null);
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => setLoading(false));
   }, [startDate, endDate, shift, hopperId]);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const loadAlerts = () => {
+      fetchAlerts()
+        .then(setAlerts)
+        .catch(() => setAlerts([]));
+    };
+    loadAlerts();
+    const intervalId = window.setInterval(loadAlerts, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const precisionColor =
     dashboard &&
@@ -66,13 +76,24 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-900">
-      <Header />
+      <Header currentView={currentView} onNavigate={onNavigate} />
       <FilterBar filters={filters} />
 
       <main className="flex-1 p-6 space-y-6 overflow-auto">
+        <AlertBanner alerts={alerts} />
+
         {error && (
           <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm">
-            {error}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={() => void loadDashboard()}
+                className="rounded-md bg-red-800/60 px-3 py-1.5 text-xs font-medium text-red-100 hover:bg-red-800"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         )}
 
@@ -85,7 +106,6 @@ export default function Dashboard() {
 
         {!loading && dashboard && (
           <>
-            {/* KPI Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <KpiCard
                 title="Total Material Charged"
@@ -104,7 +124,7 @@ export default function Dashboard() {
                 value={`${dashboard.kpis.avg_precision_pct.toFixed(4)}%`}
                 icon={Target}
                 color={precisionColor}
-                subtitle={`Within \u00B10.5% tolerance`}
+                subtitle="Within ±0.5% tolerance"
               />
               <KpiCard
                 title="Avg Cycle Time"
@@ -114,7 +134,6 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
               <div className="lg:col-span-3">
                 <PrecisionControlChart data={dashboard.precision} />
@@ -126,10 +145,17 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Cycle Time Row */}
-            <CycleTimeBarChart data={dashboard.cycle_times.by_hopper} />
+            <DailyAggregationChart data={dashboard.aggregations.by_day} />
 
-            {/* Data Table Row */}
+            <CycleTimeBarChart
+              data={dashboard.cycle_times.by_hopper}
+              title="Cycle Time by Hopper (Stacked)"
+            />
+            <CycleTimeBarChart
+              data={dashboard.cycle_times.by_shift}
+              title="Cycle Time by Shift (Stacked)"
+            />
+
             <DataTable rows={dashboard.shift_report.rows} />
           </>
         )}

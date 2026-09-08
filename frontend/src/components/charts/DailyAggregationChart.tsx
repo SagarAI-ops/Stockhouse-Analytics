@@ -1,12 +1,11 @@
 import {
-  BarChart,
-  Bar,
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
 } from "recharts";
 import type { AggregationEntry } from "../../types";
 
@@ -14,20 +13,21 @@ interface Props {
   data: AggregationEntry[];
 }
 
-const COLORS = ["#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+export default function DailyAggregationChart({ data }: Props) {
+  const sorted = [...data].sort((a, b) => a.group_key.localeCompare(b.group_key));
 
-export default function MaterialAggregationChart({ data }: Props) {
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 shadow-lg p-5">
       <h3 className="text-sm font-semibold text-slate-200 mb-4">
-        Material Tonnage Distribution
+        Daily Material Charged
       </h3>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} barCategoryGap="25%">
+        <AreaChart data={sorted}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
           <XAxis
             dataKey="group_key"
-            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            tick={{ fill: "#94a3b8", fontSize: 10 }}
+            interval="preserveStartEnd"
           />
           <YAxis
             tick={{ fill: "#94a3b8", fontSize: 10 }}
@@ -52,15 +52,15 @@ export default function MaterialAggregationChart({ data }: Props) {
               "Total Weight",
             ]}
           />
-          <Bar dataKey="total_weight_tons" radius={[6, 6, 0, 0]} isAnimationActive={false}>
-            {data.map((_, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={COLORS[index % COLORS.length]}
-              />
-            ))}
-          </Bar>
-        </BarChart>
+          <Area
+            type="monotone"
+            dataKey="total_weight_tons"
+            stroke="#22d3ee"
+            fill="#22d3ee"
+            fillOpacity={0.25}
+            isAnimationActive={false}
+          />
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

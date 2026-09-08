@@ -79,7 +79,10 @@ export default function PrecisionControlChart({ data }: Props) {
               fontSize: 12,
             }}
             labelStyle={{ color: "#e2e8f0" }}
-            formatter={(value: number) => [`${value.toFixed(4)}%`, "Deviation"]}
+            formatter={(value) => [
+              `${Number(value ?? 0).toFixed(4)}%`,
+              "Deviation",
+            ]}
           />
           <ReferenceLine
             y={data.ucl}

@@ -98,3 +98,71 @@ class FilterOptions(BaseModel):
     materials: List[str]
     date_min: str
     date_max: str
+
+# ---------------------------------------------------------------------------
+# Chat models (new)
+# ---------------------------------------------------------------------------
+
+class ChatMessage(BaseModel):
+    role: str = Field(description="'user' or 'assistant'")
+    content: str = Field(description="Message text")
+
+class ChatRequest(BaseModel):
+    message: str = Field(description="User's latest message")
+    history: List[ChatMessage] = Field(description="Chat history, oldest first")
+
+class ChatResponse(BaseModel):
+    role: str = Field(default="assistant", description="Always 'assistant'")
+    content: str = Field(description="Assistant's reply")
+
+
+class ForecastPoint(BaseModel):
+    date: str
+    predicted_tons: float
+    lower_bound: float
+    upper_bound: float
+
+
+class ForecastSeries(BaseModel):
+    material: str
+    points: List[ForecastPoint]
+
+
+class ForecastResponse(BaseModel):
+    series: List[ForecastSeries]
+    horizon_days: int
+    material: str
+
+
+class Alert(BaseModel):
+    severity: str = Field(description="'warning' or 'critical'")
+    hopper_id: str
+    message: str
+    batch_id: str
+    timestamp: str
+
+
+class AnomalyEntry(BaseModel):
+    batch_id: str
+    timestamp: str
+    hopper_id: str
+    material_type: str
+    deviation_pct: float
+    cycle_time_sec: int
+    reason: str
+
+
+class AnomalyResponse(BaseModel):
+    items: List[AnomalyEntry]
+    total: int
+
+
+class TrendPoint(BaseModel):
+    date: str
+    actual_tons: float
+    moving_avg_tons: float
+
+
+class TrendResponse(BaseModel):
+    points: List[TrendPoint]
+    window_days: int

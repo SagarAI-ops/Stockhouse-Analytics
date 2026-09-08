@@ -17,6 +17,10 @@ from models import (
     AggregationResponse,
     ShiftReportRow,
     ShiftReportResponse,
+    AnomalyEntry,
+    AnomalyResponse,
+    TrendPoint,
+    TrendResponse,
 )
 
 
@@ -167,3 +171,56 @@ def get_shift_report(df: pd.DataFrame) -> ShiftReportResponse:
         )
 
     return ShiftReportResponse(rows=rows, total_rows=len(rows))
+
+
+# ---------------------------------------------------------------------------
+# Anomalies & trends
+# ---------------------------------------------------------------------------
+
+def get_anomalies(df: pd.DataFrame) -> AnomalyResponse:
+    if df.empty:
+        return AnomalyResponse(items=[], total=0)
+
+    items: List[AnomalyEntry] = []
+    for _, row in df.iterrows():
+        reasons: List[str] = []
+        if abs(float(row["deviation_pct"])) > 0.5:
+            reasons.append("outside ±0.5% filling tolerance")
+        if reasons:
+            items.append(
+                AnomalyEntry(
+                    batch_id=str(row["batch_id"]),
+                    timestamp=row["timestamp_start"].isoformat(),
+                    hopper_id=str(row["hopper_id"]),
+                    material_type=str(row["material_type"]),
+                    deviation_pct=round(float(row["deviation_pct"]), 4),
+                    cycle_time_sec=int(row["total_cycle_time"]),
+                    reason="; ".join(reasons),
+                )
+            )
+
+    items.sort(key=lambda x: abs(x.deviation_pct), reverse=True)
+    return AnomalyResponse(items=items[:200], total=len(items))
+
+
+def get_trend(df: pd.DataFrame, window_days: int = 7) -> TrendResponse:
+    window = max(1, int(window_days))
+    if df.empty:
+        return TrendResponse(points=[], window_days=window)
+
+    daily = (
+        df.groupby("date")["actual_weight_kg"]
+        .sum()
+        .sort_index()
+        / 1000.0
+    )
+    moving = daily.rolling(window=window, min_periods=1).mean()
+    points = [
+        TrendPoint(
+            date=str(idx),
+            actual_tons=round(float(actual), 2),
+            moving_avg_tons=round(float(moving.loc[idx]), 2),
+        )
+        for idx, actual in daily.items()
+    ]
+    return TrendResponse(points=points, window_days=window)

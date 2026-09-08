@@ -9,6 +9,7 @@ export default {
           card: "#1e293b",
           border: "#334155",
         },
+        "ai-accent": "var(--color-ai-accent)",
       },
     },
   },

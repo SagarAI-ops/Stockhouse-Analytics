@@ -2,12 +2,17 @@
 Blast Furnace Stockhouse Analytics – FastAPI Backend
 """
 
-from typing import Optional
-from datetime import datetime
+from pathlib import Path
+from typing import List, Optional
 
 import pandas as pd
-from fastapi import FastAPI, Query
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+
+_BACKEND_DIR = Path(__file__).resolve().parent
+load_dotenv(_BACKEND_DIR.parent / ".env")
+load_dotenv(_BACKEND_DIR / ".env")
 
 from database import get_dataframe
 from analytics_engine import (
@@ -16,21 +21,30 @@ from analytics_engine import (
     get_cycle_times,
     get_aggregations,
     get_shift_report,
+    get_anomalies,
+    get_trend,
 )
 from models import (
     DashboardResponse,
     FilterOptions,
+    ChatRequest,
+    ChatResponse,
+    ForecastResponse,
+    Alert,
+    AnomalyResponse,
+    TrendResponse,
 )
+from llm_service import GeminiService, LLMNotConfigured
+from chat_service import ChatService
+from forecast_service import get_forecast
+from alert_service import get_alerts
 
 app = FastAPI(
     title="BF Stockout Analytics API",
     version="1.0.0",
-    description="Blast Furnace Stockhouse Stockout Analytics Dashboard – Phase 1",
+    description="Blast Furnace Stockhouse Stockout Analytics Dashboard",
 )
 
-# ---------------------------------------------------------------------------
-# CORS – allow Vite dev server
-# ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -44,10 +58,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+llm_service = GeminiService()
+chat_service = ChatService(llm_service)
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _filter_df(
     df: pd.DataFrame,
@@ -71,13 +84,38 @@ def _filter_df(
     return df.loc[mask]
 
 
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "service": "BF Stockout Analytics API",
+        "health": "/api/health",
+        "docs": "/docs",
+    }
+
 
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(request: ChatRequest):
+    if not request.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    if not llm_service.is_configured:
+        raise HTTPException(status_code=503, detail="LLM not configured")
+    try:
+        response_content = chat_service.handle_message(
+            request.message,
+            request.history,
+            get_dataframe(),
+        )
+    except LLMNotConfigured:
+        raise HTTPException(status_code=503, detail="LLM not configured") from None
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"LLM request failed: {exc}") from exc
+    return ChatResponse(content=response_content)
 
 
 @app.get("/api/filters", response_model=FilterOptions)
@@ -109,3 +147,26 @@ def dashboard_data(
         aggregations=get_aggregations(filtered),
         shift_report=get_shift_report(filtered),
     )
+
+
+@app.get("/api/forecast", response_model=ForecastResponse)
+def forecast(
+    material: str = Query("All"),
+    days: int = Query(7, ge=1, le=30),
+):
+    return get_forecast(get_dataframe(), material=material, days=days)
+
+
+@app.get("/api/alerts", response_model=List[Alert])
+def alerts():
+    return get_alerts(get_dataframe())
+
+
+@app.get("/api/anomalies", response_model=AnomalyResponse)
+def anomalies():
+    return get_anomalies(get_dataframe())
+
+
+@app.get("/api/trend", response_model=TrendResponse)
+def trend(window_days: int = Query(7, ge=1, le=60)):
+    return get_trend(get_dataframe(), window_days=window_days)
