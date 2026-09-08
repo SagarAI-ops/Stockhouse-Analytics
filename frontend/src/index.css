@@ -5,6 +5,7 @@
 :root {
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   color-scheme: dark;
+  --color-ai-accent: #22d3ee;
 }
 
 body {

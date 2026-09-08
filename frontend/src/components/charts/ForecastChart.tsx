@@ -1,38 +1,36 @@
 import {
-  BarChart,
-  Bar,
+  Area,
+  ComposedChart,
+  CartesianGrid,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
-import type { CycleTimeEntry } from "../../types";
+import type { ForecastPoint } from "../../types";
 
 interface Props {
-  data: CycleTimeEntry[];
+  data: ForecastPoint[];
   title?: string;
 }
 
-export default function CycleTimeBarChart({
-  data,
-  title = "Cycle Time by Hopper (Stacked)",
-}: Props) {
+export default function ForecastChart({ data, title = "Forecast" }: Props) {
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 shadow-lg p-5">
       <h3 className="text-sm font-semibold text-slate-200 mb-4">{title}</h3>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} barCategoryGap="20%">
+      <ResponsiveContainer width="100%" height={280}>
+        <ComposedChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
           <XAxis
-            dataKey="group_key"
-            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            dataKey="date"
+            tick={{ fill: "#94a3b8", fontSize: 10 }}
+            interval="preserveStartEnd"
           />
           <YAxis
             tick={{ fill: "#94a3b8", fontSize: 10 }}
             label={{
-              value: "Seconds",
+              value: "Tons",
               angle: -90,
               position: "insideLeft",
               fill: "#94a3b8",
@@ -48,26 +46,32 @@ export default function CycleTimeBarChart({
             }}
             labelStyle={{ color: "#e2e8f0" }}
           />
-          <Legend
-            wrapperStyle={{ fontSize: 11, color: "#94a3b8" }}
-          />
-          <Bar
-            dataKey="avg_fill_time_sec"
-            name="Fill Time"
-            stackId="a"
-            fill="#3b82f6"
-            radius={[0, 0, 0, 0]}
+          <Area
+            type="monotone"
+            dataKey="upper_bound"
+            stroke="none"
+            fill="#22d3ee"
+            fillOpacity={0.18}
             isAnimationActive={false}
           />
-          <Bar
-            dataKey="avg_discharge_time_sec"
-            name="Discharge Time"
-            stackId="a"
-            fill="#f59e0b"
-            radius={[4, 4, 0, 0]}
+          <Area
+            type="monotone"
+            dataKey="lower_bound"
+            stroke="none"
+            fill="#0f172a"
+            fillOpacity={0.85}
             isAnimationActive={false}
           />
-        </BarChart>
+          <Line
+            type="monotone"
+            dataKey="predicted_tons"
+            stroke="#22d3ee"
+            strokeWidth={2}
+            dot={false}
+            isAnimationActive={false}
+            name="Predicted tons"
+          />
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

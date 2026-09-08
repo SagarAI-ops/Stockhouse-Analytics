@@ -1,8 +1,16 @@
 import axios from "axios";
-import type { DashboardResponse, FilterOptions } from "../types";
+import type {
+  Alert,
+  ChatRequest,
+  ChatResponse,
+  DashboardResponse,
+  FilterOptions,
+  ForecastResponse,
+  Message,
+} from "../types";
 
 const apiClient = axios.create({
-  baseURL: "http://localhost:8000/api",
+  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000/api",
   timeout: 30000,
 });
 
@@ -32,5 +40,36 @@ export async function fetchDashboardData(
     "/dashboard_data",
     { params: queryParams }
   );
+  return data;
+}
+
+export async function sendChatMessage(
+  message: string,
+  history: Message[]
+): Promise<ChatResponse> {
+  const payload: ChatRequest = { message, history };
+  const { data } = await apiClient.post<ChatResponse>("/chat", payload);
+  return data;
+}
+
+export interface ForecastParams {
+  material?: string;
+  days?: number;
+}
+
+export async function fetchForecast(
+  params: ForecastParams = {}
+): Promise<ForecastResponse> {
+  const { data } = await apiClient.get<ForecastResponse>("/forecast", {
+    params: {
+      material: params.material ?? "All",
+      days: params.days ?? 7,
+    },
+  });
+  return data;
+}
+
+export async function fetchAlerts(): Promise<Alert[]> {
+  const { data } = await apiClient.get<Alert[]>("/alerts");
   return data;
 }

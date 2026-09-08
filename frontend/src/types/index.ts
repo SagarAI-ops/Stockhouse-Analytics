@@ -89,3 +89,45 @@ export interface DashboardFilters {
   shift: string | null;
   hopperId: string | null;
 }
+
+// Chat related types
+export interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  history: Message[];
+}
+
+export interface ChatResponse {
+  role: 'assistant';
+  content: string;
+}
+
+export interface ForecastPoint {
+  date: string;
+  predicted_tons: number;
+  lower_bound: number;
+  upper_bound: number;
+}
+
+export interface ForecastSeries {
+  material: string;
+  points: ForecastPoint[];
+}
+
+export interface ForecastResponse {
+  series: ForecastSeries[];
+  horizon_days: number;
+  material: string;
+}
+
+export interface Alert {
+  severity: 'warning' | 'critical';
+  hopper_id: string;
+  message: string;
+  batch_id: string;
+  timestamp: string;
+}
